@@ -4,6 +4,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 import time
 import boto3
 import os
@@ -62,9 +63,9 @@ for author in authors:
         tag_dropdown = Select(driver.find_element(By.ID, 'tag'))  # Get the dropdown again to avoid errors
         tag_dropdown.select_by_visible_text(tag)
 
-        # Click Search dynamically, ensuring the button is clickable
-        search_button_locator = (By.CSS_SELECTOR, 'input.btn.btn-default')
-        wait_and_click(search_button_locator)
+        # Ensure the button is clickable by waiting for it to become clickable
+        search_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input.btn.btn-default')))
+        ActionChains(driver).move_to_element(search_button).click().perform()
 
         try:
             # Wait for quote results to appear dynamically, looking for quotes based on the tag
