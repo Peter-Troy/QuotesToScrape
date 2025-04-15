@@ -20,12 +20,12 @@ def kill_chrome_processes():
                 pass
 
 # Kill any existing Chrome processes
-kill_chrome_processes()  # <-- ADD THIS LINE
+kill_chrome_processes()
 
 chrome_options = Options()
-chrome_options.add_argument("--headless")  # Required for EC2
-chrome_options.add_argument("--no-sandbox")  # Critical for Linux
-chrome_options.add_argument("--disable-dev-shm-usage")  # Prevents crashes
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
 chrome_options.add_argument("--user-data-dir=/tmp/chrome-user-data")
 chrome_options.add_argument("--disable-gpu")
 chrome_options.add_argument("--disable-extensions")
@@ -39,9 +39,9 @@ chromedriver_path = '/usr/local/bin/chromedriver'
 service = Service(chromedriver_path)
 driver = webdriver.Chrome(service=service, options=chrome_options)
 driver.get("http://quotes.toscrape.com/search.aspx")
-wait = WebDriverWait(driver, 10)
+wait = WebDriverWait(driver, 15)  # Increased timeout to 15 seconds
 
-def wait_for_element(locator, timeout=10):
+def wait_for_element(locator, timeout=15):
     return WebDriverWait(driver, timeout).until(EC.visibility_of_element_located(locator))
 
 # Get all authors (skip the first placeholder)
@@ -50,58 +50,93 @@ authors = [opt.text for opt in author_select.options if opt.text.strip()][1:]
 
 all_quotes = []
 
-for author in authors:
+for author in authors[:3]:  # Just process first 3 authors for testing
     print(f"\n🔍 Searching quotes by: {author}")
     driver.get("http://quotes.toscrape.com/search.aspx")
     wait_for_element((By.ID, 'author'))
 
+    # Take screenshot before search
+    driver.save_screenshot(f'before_search_{author.replace(" ", "_")}.png')
+
     author_dropdown = Select(driver.find_element(By.ID, 'author'))
     author_dropdown.select_by_visible_text(author)
 
-    # Wait for both the tag dropdown AND results container to be ready
+    # Wait for tag dropdown to be populated
     wait.until(lambda d: len(Select(d.find_element(By.ID, "tag")).options) > 1)
-    wait.until(EC.presence_of_element_located((By.ID, 'results')))
 
     # Search quotes by author only (no tag selected)
     try:
-        search_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[type="submit"]')))
+        search_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//input[@value="Search"]')))
         search_button.click()
         
-        # Wait specifically for quotes to load
-        quotes = wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".quote .content"))
-        )
-
-        for quote in quotes:
-            text = quote.text.strip()
-            all_quotes.append({"author": author, "tag": None, "quote": text})
-            print(f"✅ {author} | No tag | {text[:50]}...")
-    except Exception as e:
-        print(f"⚠ No quotes found for {author} (no tag). Error: {str(e)[:100]}")
-
-    # Now search quotes by each tag
-    tag_dropdown = Select(driver.find_element(By.ID, 'tag'))
-    tags = [opt.text for opt in tag_dropdown.options if opt.text.strip()][1:]
-
-    for tag in tags:
-        print(f"➡ Selecting tag: {tag}")
-        tag_dropdown = Select(driver.find_element(By.ID, 'tag'))
-        tag_dropdown.select_by_visible_text(tag)
-
+        # Wait for results to load completely
+        wait.until(EC.presence_of_element_located((By.ID, 'results')))
+        time.sleep(1)  # Small delay to ensure content is loaded
+        
+        # Take screenshot after search
+        driver.save_screenshot(f'after_search_{author.replace(" ", "_")}.png')
+        
+        # Try multiple ways to locate quotes
         try:
-            search_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[type="submit"]')))
-            search_button.click()
+            quotes = driver.find_elements(By.XPATH, '//div[@class="quote"]/span[@class="text"]')
+            if not quotes:
+                quotes = driver.find_elements(By.CSS_SELECTOR, 'div.quote span.text')
             
-            quotes = wait.until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".quote .content"))
-            )
-
             for quote in quotes:
-                text = quote.text.strip()
-                all_quotes.append({"author": author, "tag": tag, "quote": text})
-                print(f"✅ {author} | {tag} | {text[:50]}...")
+                text = quote.text.strip('"')  # Remove quotation marks
+                all_quotes.append({"author": author, "tag": None, "quote": text})
+                print(f"✅ {author} | No tag | {text[:50]}...")
+                
         except Exception as e:
-            print(f"⚠ No quotes found for {author} - {tag}. Error: {str(e)[:100]}")
+            print(f"⚠ Could not locate quotes for {author}. Error: {str(e)}")
+            print("Trying alternative quote location method...")
+            results_div = driver.find_element(By.ID, 'results')
+            print("Results div content:", results_div.text[:200])  # Print first 200 chars
+            
+    except Exception as e:
+        print(f"⚠ Search failed for {author}. Error: {str(e)}")
+        driver.save_screenshot(f'error_{author.replace(" ", "_")}.png')
+
+    # Now search quotes by each tag (for first author only for testing)
+    if author == authors[0]:
+        tag_dropdown = Select(driver.find_element(By.ID, 'tag'))
+        tags = [opt.text for opt in tag_dropdown.options if opt.text.strip()][1:3]  # Just first 2 tags for testing
+        
+        for tag in tags:
+            print(f"\n➡ Selecting tag: {tag} for author: {author}")
+            driver.get("http://quotes.toscrape.com/search.aspx")
+            wait_for_element((By.ID, 'author'))
+            
+            # Select author again
+            author_dropdown = Select(driver.find_element(By.ID, 'author'))
+            author_dropdown.select_by_visible_text(author)
+            
+            # Select tag
+            tag_dropdown = Select(driver.find_element(By.ID, 'tag'))
+            tag_dropdown.select_by_visible_text(tag)
+            
+            try:
+                search_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//input[@value="Search"]')))
+                search_button.click()
+                
+                wait.until(EC.presence_of_element_located((By.ID, 'results')))
+                time.sleep(1)
+                
+                try:
+                    quotes = driver.find_elements(By.XPATH, '//div[@class="quote"]/span[@class="text"]')
+                    if not quotes:
+                        quotes = driver.find_elements(By.CSS_SELECTOR, 'div.quote span.text')
+                    
+                    for quote in quotes:
+                        text = quote.text.strip('"')
+                        all_quotes.append({"author": author, "tag": tag, "quote": text})
+                        print(f"✅ {author} | {tag} | {text[:50]}...")
+                        
+                except Exception as e:
+                    print(f"⚠ Could not locate quotes for {author} with tag {tag}. Error: {str(e)}")
+                    
+            except Exception as e:
+                print(f"⚠ Search failed for {author} with tag {tag}. Error: {str(e)}")
 
 # Save to JSON
 json_file_path = "quotes_by_author_and_tag.json"
