@@ -9,12 +9,30 @@ import time
 import json
 import boto3
 import os
+import psutil
 
-# Set up Chrome options for headless operation
+def kill_chrome_processes():
+    for proc in psutil.process_iter(['name']):
+        if proc.info['name'] in ('chrome', 'chromedriver'):
+            try:
+                proc.kill()
+            except psutil.NoSuchProcess:
+                pass
+
+# Kill any existing Chrome processes
+kill_chrome_processes()  # <-- ADD THIS LINE
+
 chrome_options = Options()
-#chrome_options.add_argument("--headless")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--headless")  # Required for EC2
+chrome_options.add_argument("--no-sandbox")  # Critical for Linux
+chrome_options.add_argument("--disable-dev-shm-usage")  # Prevents crashes
+chrome_options.add_argument("--user-data-dir=/tmp/chrome-user-data")
+chrome_options.add_argument("--disable-gpu")
+chrome_options.add_argument("--disable-extensions")
+chrome_options.add_argument("--disable-infobars")
+chrome_options.add_argument("--remote-debugging-port=9222")
+chrome_options.add_argument("--disable-application-cache")
+chrome_options.add_argument("--disable-setuid-sandbox")
 
 # ChromeDriver setup
 chromedriver_path = '/usr/local/bin/chromedriver'
