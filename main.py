@@ -101,5 +101,5 @@ def upload_to_s3(file_name, bucket_name, object_name=None):
         print(f"❌ Upload failed: {e}")
 
 # Example usage
-upload_to_s3("quotes_output.csv", "quotes-scraper-petermacero")
+upload_to_s3("output/quotes_output.csv", "quotes-scraper-petermacero")
 
