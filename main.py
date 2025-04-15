@@ -89,14 +89,17 @@ if __name__ == "__main__":
 
 import boto3
 
-def upload_to_s3(local_file, bucket_name, s3_key):
+def upload_to_s3(file_name, bucket_name, object_name=None):
+    if object_name is None:
+        object_name = file_name
+
     s3 = boto3.client('s3')
     try:
-        s3.upload_file(local_file, bucket_name, s3_key)
-        print(f"✅ Uploaded {local_file} to s3://{bucket_name}/{s3_key}")
+        s3.upload_file(file_name, bucket_name, object_name)
+        print(f"✅ Uploaded {file_name} to s3://{bucket_name}/{object_name}")
     except Exception as e:
         print(f"❌ Upload failed: {e}")
 
+# Example usage
+upload_to_s3("quotes_output.csv", "quotes-scraper-petermacero")
 
-# Usage
-upload_to_s3("output/quotes_output.csv", "your-s3-bucket-name", "quotes/quotes_output.csv")
