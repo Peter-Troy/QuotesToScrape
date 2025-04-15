@@ -1,78 +1,69 @@
 import requests
 from bs4 import BeautifulSoup
 import json
-import boto3
-import os
 
 BASE_URL = "http://quotes.toscrape.com/search.aspx"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0"
-}
 
+# Start a session to persist cookies and headers
 session = requests.Session()
-session.headers.update(HEADERS)
 
-def get_dropdown_options(soup, element_id):
-    select = soup.find("select", id=element_id)
-    if not select:
-        return []
-    return [option.text.strip() for option in select.find_all("option") if option.text.strip()][1:]
-
-def get_updated_tag_options(author):
-    payload = {"author": author}
-    response = session.post(BASE_URL, data=payload)
-    soup = BeautifulSoup(response.content, "html.parser")
-    return get_dropdown_options(soup, "tag")
-
-def get_quotes(author, tag):
-    payload = {"author": author, "tag": tag}
-    response = session.post(BASE_URL, data=payload)
-    soup = BeautifulSoup(response.content, "html.parser")
-    quotes = soup.find_all("div", class_="quote")
-    results = []
-    for quote in quotes:
-        content = quote.find("span", class_="content")
-        if content:
-            results.append({"author": author, "tag": tag, "quote": content.text.strip()})
-    return results
-
-# Step 1: Get initial page to extract authors
+# Step 1: Get initial form values to extract authors and tags
 response = session.get(BASE_URL)
-soup = BeautifulSoup(response.content, "html.parser")
+soup = BeautifulSoup(response.text, "html.parser")
 
-authors = get_dropdown_options(soup, "author")
+# Extract authors
+author_select = soup.find("select", {"id": "author"})
+authors = [option.text.strip() for option in author_select.find_all("option") if option.text.strip()][1:]
+
+# Final data to store
 all_quotes = []
 
+# Loop through each author and associated tags
 for author in authors:
-    tags = get_updated_tag_options(author)
+    print(f"\n🔍 Searching quotes for author: {author}")
+    
+    # Get updated tags for the selected author (requires submitting form with only author)
+    form_data_author = {
+        "author": author,
+        "tag": "",
+        "submit_button": "Search"
+    }
+    res_author = session.post(BASE_URL, data=form_data_author)
+    soup = BeautifulSoup(res_author.text, "html.parser")
+    
+    # Get updated tag list
+    tag_select = soup.find("select", {"id": "tag"})
+    if not tag_select:
+        continue
+    tags = [option.text.strip() for option in tag_select.find_all("option") if option.text.strip()][1:]
+    
     for tag in tags:
-        quotes = get_quotes(author, tag)
-        if quotes:
-            print(f"✅ {author} | {tag} | {quotes[0]['quote'][:50]}...")
-            all_quotes.extend(quotes)
-        else:
+        print(f"🧠 Trying tag: {tag}")
+        form_data = {
+            "author": author,
+            "tag": tag,
+            "submit_button": "Search"
+        }
+
+        result = session.post(BASE_URL, data=form_data)
+        result_soup = BeautifulSoup(result.text, "html.parser")
+        quotes = result_soup.find_all("div", class_="quote")
+
+        if not quotes:
             print(f"⚠ No quotes found for {author} - {tag}")
+            continue
+
+        for quote_div in quotes:
+            text = quote_div.find("span", class_="content").text.strip()
+            all_quotes.append({
+                "author": author,
+                "tag": tag,
+                "quote": text
+            })
+            print(f"✅ {author} | {tag} | {text[:50]}...")
 
 # Save to JSON
-filename = "quotes_by_author_and_tag.json"
-with open(filename, "w", encoding="utf-8") as f:
+with open("quotes_by_author_and_tag.json", "w", encoding="utf-8") as f:
     json.dump(all_quotes, f, indent=4, ensure_ascii=False)
 
-print(f"All quotes saved to {filename}")
-
-# Upload to S3
-def upload_to_s3(file_name, bucket_name, object_name=None):
-    if object_name is None:
-        object_name = file_name
-    if not os.path.exists(file_name):
-        print(f"File {file_name} does not exist.")
-        return
-    s3 = boto3.client("s3")
-    try:
-        s3.upload_file(file_name, bucket_name, object_name)
-        print(f"Uploaded {file_name} to s3://{bucket_name}/{object_name}")
-    except Exception as e:
-        print(f"Upload failed: {e}")
-
-# Replace with your actual bucket name
-upload_to_s3(filename, "quotes-scraper-petermacero")
+print("\n🎉 All quotes saved to quotes_by_author_and_tag.json")
