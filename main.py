@@ -100,7 +100,7 @@ def save_to_csv(author_quotes, filename="output/quotes_output.csv"):
         logging.info(f"Saved {len(author_quotes)} quotes to {filename}")
     except Exception as e:
         logging.error(f"Error while saving to CSV: {e}")
-        print(f"❌ Error while saving to CSV: {e}")
+        print(f" Error while saving to CSV: {e}")
 
 def upload_to_s3(local_file, bucket_name, s3_key):
     """Upload the CSV file to an S3 bucket."""
@@ -109,7 +109,7 @@ def upload_to_s3(local_file, bucket_name, s3_key):
         s3.upload_file(local_file, bucket_name, s3_key)
         print(f"✅ Uploaded {local_file} to s3://{bucket_name}/{s3_key}")
     except Exception as e:
-        print(f"❌ Upload failed: {e}")
+        print(f" Upload failed: {e}")
 
 if __name__ == "__main__":
     # Step 1: Scrape all quotes from the website
