@@ -86,3 +86,17 @@ def save_to_csv(author_quotes, filename="output/quotes_output.csv"):
 if __name__ == "__main__":
     quotes = scrape_all_quotes()
     save_to_csv(quotes)
+
+import boto3
+
+def upload_to_s3(local_file, bucket_name, s3_key):
+    s3 = boto3.client('s3')
+    try:
+        s3.upload_file(local_file, bucket_name, s3_key)
+        print(f"✅ Uploaded {local_file} to s3://{bucket_name}/{s3_key}")
+    except Exception as e:
+        print(f"❌ Upload failed: {e}")
+
+
+# Usage
+upload_to_s3("output/quotes_output.csv", "your-s3-bucket-name", "quotes/quotes_output.csv")
