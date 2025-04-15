@@ -1,114 +1,78 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait, Select
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
-import time
-import datetime
+import requests
+from bs4 import BeautifulSoup
 import json
 import boto3
 import os
 
-# === Chrome Options ===
-chrome_options = Options()
-# Comment out headless mode for debugging (re-enable later)
-# chrome_options.add_argument("--headless")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
+BASE_URL = "http://quotes.toscrape.com/search.aspx"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
 
-# === Chrome Driver Path ===
-chromedriver_path = '/usr/local/bin/chromedriver'
-service = Service(chromedriver_path)
+session = requests.Session()
+session.headers.update(HEADERS)
 
-# === Start the browser ===
-driver = webdriver.Chrome(service=service, options=chrome_options)
-driver.implicitly_wait(1)
-driver.get("http://quotes.toscrape.com/search.aspx")
-wait = WebDriverWait(driver, 10)
+def get_dropdown_options(soup, element_id):
+    select = soup.find("select", id=element_id)
+    if not select:
+        return []
+    return [option.text.strip() for option in select.find_all("option") if option.text.strip()][1:]
 
-# === Helper Functions ===
-def wait_for_element(locator, timeout=5):
-    return WebDriverWait(driver, timeout).until(
-        EC.visibility_of_element_located(locator)
-    )
+def get_updated_tag_options(author):
+    payload = {"author": author}
+    response = session.post(BASE_URL, data=payload)
+    soup = BeautifulSoup(response.content, "html.parser")
+    return get_dropdown_options(soup, "tag")
 
-def wait_and_click(element_locator, timeout=5):
-    element = WebDriverWait(driver, timeout).until(
-        EC.element_to_be_clickable(element_locator)
-    )
-    element.click()
+def get_quotes(author, tag):
+    payload = {"author": author, "tag": tag}
+    response = session.post(BASE_URL, data=payload)
+    soup = BeautifulSoup(response.content, "html.parser")
+    quotes = soup.find_all("div", class_="quote")
+    results = []
+    for quote in quotes:
+        content = quote.find("span", class_="content")
+        if content:
+            results.append({"author": author, "tag": tag, "quote": content.text.strip()})
+    return results
 
-# === Collect Authors ===
-author_select = Select(wait_for_element((By.ID, 'author')))
-authors = [opt.text for opt in author_select.options if opt.text.strip()][1:]
+# Step 1: Get initial page to extract authors
+response = session.get(BASE_URL)
+soup = BeautifulSoup(response.content, "html.parser")
 
+authors = get_dropdown_options(soup, "author")
 all_quotes = []
 
-# === Main Loop ===
 for author in authors:
-    driver.get("http://quotes.toscrape.com/search.aspx")
-    wait_for_element((By.ID, 'author'))
-
-    author_dropdown = Select(driver.find_element(By.ID, 'author'))
-    author_dropdown.select_by_visible_text(author)
-
-    time.sleep(1)  # Let tags update
-
-    tag_dropdown = Select(driver.find_element(By.ID, 'tag'))
-    tags = [opt.text for opt in tag_dropdown.options if opt.text.strip()][1:]
-
+    tags = get_updated_tag_options(author)
     for tag in tags:
-        tag_dropdown = Select(driver.find_element(By.ID, 'tag'))
-        tag_dropdown.select_by_visible_text(tag)
-
-        # Click search using ActionChains to simulate interaction
-        search_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input.btn.btn-default')))
-        ActionChains(driver).move_to_element(search_button).click().perform()
-
-        # Wait manually up to 10 seconds for quotes to appear
-        start_time = datetime.datetime.now()
-        quotes = []
-        while True:
-            quotes = driver.find_elements(By.CLASS_NAME, "quote")
-            if quotes or (datetime.datetime.now() - start_time).seconds > 10:
-                break
-            time.sleep(1)
-
+        quotes = get_quotes(author, tag)
         if quotes:
-            for quote in quotes:
-                text = quote.find_element(By.CLASS_NAME, "content").text.strip()
-                all_quotes.append({"author": author, "tag": tag, "quote": text})
-                print(f"✅ {author} | {tag} | {text[:50]}...")
+            print(f"✅ {author} | {tag} | {quotes[0]['quote'][:50]}...")
+            all_quotes.extend(quotes)
         else:
-            print(f"⚠ No quotes found for {author} - {tag}. Saving debug HTML...")
-            with open("debug_page.html", "w", encoding="utf-8") as f:
-                f.write(driver.page_source)
+            print(f"⚠ No quotes found for {author} - {tag}")
 
-# === Save to JSON ===
-with open("quotes_by_author_and_tag.json", "w", encoding="utf-8") as json_file:
-    json.dump(all_quotes, json_file, indent=4, ensure_ascii=False)
+# Save to JSON
+filename = "quotes_by_author_and_tag.json"
+with open(filename, "w", encoding="utf-8") as f:
+    json.dump(all_quotes, f, indent=4, ensure_ascii=False)
 
-print("✅ All quotes saved to quotes_by_author_and_tag.json")
+print(f"All quotes saved to {filename}")
 
-driver.quit()
-
-# === Upload to S3 ===
+# Upload to S3
 def upload_to_s3(file_name, bucket_name, object_name=None):
     if object_name is None:
         object_name = file_name
-
     if not os.path.exists(file_name):
         print(f"File {file_name} does not exist.")
         return
-
-    s3 = boto3.client('s3')
-
+    s3 = boto3.client("s3")
     try:
         s3.upload_file(file_name, bucket_name, object_name)
-        print(f"✅ Uploaded {file_name} to s3://{bucket_name}/{object_name}")
+        print(f"Uploaded {file_name} to s3://{bucket_name}/{object_name}")
     except Exception as e:
-        print(f"❌ Upload failed: {e}")
+        print(f"Upload failed: {e}")
 
-upload_to_s3("quotes_by_author_and_tag.json", "quotes-scraper-petermacero")
+# Replace with your actual bucket name
+upload_to_s3(filename, "quotes-scraper-petermacero")
