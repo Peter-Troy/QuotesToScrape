@@ -13,8 +13,8 @@ chrome_options = Options()
 chrome_options.add_argument("--headless")  # Run browser in headless mode (no UI)
 chrome_options.add_argument("--no-sandbox")  # Use no sandbox mode (important for cloud environments)
 
-# Specify the path to chromedriver using the Service object
-chromedriver_path = '/usr/lib/chromium-browser/chromedriver'
+# Specify the path to chromedriver using the Service object (use the path to Google Chrome's Chromedriver)
+chromedriver_path = '/usr/bin/chromedriver'  # Update this if necessary
 service = Service(chromedriver_path)
 
 # Start the browser
