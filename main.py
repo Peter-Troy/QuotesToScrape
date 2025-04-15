@@ -1,138 +1,105 @@
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
-import time
+from selenium.webdriver.firefox.options import Options
 import json
+import time
 import boto3
 import os
-import psutil
 
-def kill_chrome_processes():
-    for proc in psutil.process_iter(['name']):
-        if proc.info['name'] in ('chrome', 'chromedriver'):
-            try:
-                proc.kill()
-            except psutil.NoSuchProcess:
-                pass
+# Configure Firefox for EC2
+def setup_browser():
+    firefox_options = Options()
+    firefox_options.add_argument("--headless")
+    firefox_options.add_argument("--window-size=1280,720")
+    firefox_options.add_argument("--no-sandbox")
+    firefox_options.add_argument("--disable-dev-shm-usage")  # Critical for EC2
+    
+      # Initialize Firefox with explicit GeckoDriver path
+    return webdriver.Firefox(
+        service=Service('/usr/local/bin/geckodriver'),  # <-- THIS GOES HERE
+        options=firefox_options
+    )
 
-# Kill any existing Chrome processes
-kill_chrome_processes()
-
-chrome_options = Options()
-chrome_options.add_argument("--headless")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
-chrome_options.add_argument("--user-data-dir=/tmp/chrome-user-data")
-chrome_options.add_argument("--window-size=1920,1080")  # Added window size
-chrome_options.add_argument("--disable-gpu")
-chrome_options.add_argument("--disable-extensions")
-chrome_options.add_argument("--disable-infobars")
-chrome_options.add_argument("--remote-debugging-port=9222")
-chrome_options.add_argument("--disable-application-cache")
-chrome_options.add_argument("--disable-setuid-sandbox")
-
-# ChromeDriver setup
-chromedriver_path = '/usr/local/bin/chromedriver'
-service = Service(chromedriver_path)
-driver = webdriver.Chrome(service=service, options=chrome_options)
-wait = WebDriverWait(driver, 15)
-
-def safe_click(element):
-    """Helper function to click elements reliably"""
+def scrape_quotes():
+    driver = webdriver.Firefox(
+        service=Service('/usr/local/bin/geckodriver'),
+        options=firefox_options
+    )
+    
     try:
-        # Try regular click first
-        element.click()
-    except:
-        try:
-            # Try ActionChains if regular click fails
-            ActionChains(driver).move_to_element(element).click().perform()
-        except:
-            # Fall back to JavaScript click
-            driver.execute_script("arguments[0].click();", element)
-
-def wait_for_element(locator, timeout=15):
-    return wait.until(EC.visibility_of_element_located(locator))
-
-# Get all authors (skip the first placeholder)
-driver.get("http://quotes.toscrape.com/search.aspx")
-author_select = Select(wait_for_element((By.ID, 'author')))
-authors = [opt.text for opt in author_select.options if opt.text.strip()][1:]
-
-all_quotes = []
-
-for author in authors[:3]:  # Test with first 3 authors
-    print(f"\n🔍 Searching quotes by: {author}")
-    driver.get("http://quotes.toscrape.com/search.aspx")
-    wait_for_element((By.ID, 'author'))
-
-    # Select author
-    author_dropdown = Select(driver.find_element(By.ID, 'author'))
-    author_dropdown.select_by_visible_text(author)
-
-    # Wait for tag dropdown
-    wait.until(lambda d: len(Select(d.find_element(By.ID, "tag")).options) > 1)
-
-    # Search quotes by author only
-    try:
-        search_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input.btn.btn-default')))
+        # Load page
+        driver.get("http://quotes.toscrape.com/search.aspx")
         
-        # Scroll to button and click using reliable method
-        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", search_button)
-        time.sleep(0.5)
-        safe_click(search_button)
+        # Get authors
+        author_select = Select(wait.until(
+            EC.presence_of_element_located((By.ID, 'author'))
+        ))
+        authors = [opt.text for opt in author_select.options if opt.text.strip()][1:]
         
-        # Wait for results
-        wait.until(EC.presence_of_element_located((By.ID, 'results')))
-        time.sleep(1)
-        
-        # Find quotes - try multiple selectors
-        quotes = []
-        for selector in [
-            '//div[@class="quote"]/span[@class="text"]',  # XPath
-            'div.quote span.text'  # CSS
-        ]:
-            quotes = driver.find_elements(By.XPATH if '//' in selector else By.CSS_SELECTOR, selector)
-            if quotes:
-                break
-                
-        if quotes:
-            for quote in quotes:
-                text = quote.text.strip('"')
-                all_quotes.append({"author": author, "tag": None, "quote": text})
-                print(f"✅ {author} | No tag | {text[:50]}...")
-        else:
-            print(f"⚠ No quotes found for {author} (no tag)")
-            print("Page content:", driver.find_element(By.TAG_NAME, 'body').text[:500])
+        for author in authors:
+            print(f"\n🔍 Processing: {author}")
+            driver.get("http://quotes.toscrape.com/search.aspx")
             
-    except Exception as e:
-        print(f"⚠ Search failed for {author}. Error: {str(e)}")
-        driver.save_screenshot(f'error_{author.replace(" ", "_")}.png')
+            # Select author
+            Select(wait.until(
+                EC.presence_of_element_located((By.ID, 'author'))
+            )).select_by_visible_text(author)
+            time.sleep(1)
+            
+            # Get tags
+            tag_dropdown = Select(driver.find_element(By.ID, 'tag'))
+            tags = [opt.text for opt in tag_dropdown.options if opt.text.strip()][1:]
+            
+            for tag in tags:
+                print(f"   ⮑ Tag: {tag}")
+                Select(driver.find_element(By.ID, 'tag')).select_by_visible_text(tag)
+                
+                # Click search (with JS fallback)
+                button = wait.until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, 'input.btn.btn-default'))
+                )
+                driver.execute_script("arguments[0].click();", button)
+                time.sleep(1)
+                
+                # Extract quotes
+                try:
+                    quotes = wait.until(
+                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div.quote span.text'))
+                    )
+                    for quote in quotes:
+                        all_quotes.append({
+                            "author": author,
+                            "tag": tag,
+                            "quote": quote.text.strip('"')
+                        })
+                except:
+                    if "No quotes found" not in driver.page_source:
+                        print("      ⚠ Unexpected error (screenshot saved)")
+                        driver.save_screenshot('error.png')
+        
+        return all_quotes
+    
+    finally:
+        driver.quit()
 
-# Save and upload results (same as before)
-json_file_path = "quotes_by_author_and_tag.json"
-with open(json_file_path, "w", encoding="utf-8") as json_file:
-    json.dump(all_quotes, json_file, indent=4, ensure_ascii=False)
-
-driver.quit()
-print(f"\n📁 All quotes saved to {json_file_path}")
-
-def upload_to_s3(file_name, bucket_name, object_name=None):
-    if object_name is None:
-        object_name = file_name
-
-    if not os.path.exists(file_name):
-        print(f"File {file_name} does not exist.")
-        return
-
+# Main execution
+if __name__ == "__main__":
+    print("🚀 Starting scrape...")
+    quotes = scrape_quotes()
+    
+    # Save to JSON
+    filename = "quotes.json"
+    with open(filename, "w") as f:
+        json.dump(quotes, f, indent=2)
+    print(f"✅ Saved {len(quotes)} quotes to {filename}")
+    
+    # Upload to S3
     s3 = boto3.client('s3')
     try:
-        s3.upload_file(file_name, bucket_name, object_name)
-        print(f"☁ Uploaded {file_name} to s3://{bucket_name}/{object_name}")
+        s3.upload_file(filename, "quotes-scraper-petermacero", filename)
+        print(f"📤 Uploaded to S3: s3://quotes-scraper-petermacero/{filename}")
     except Exception as e:
-        print(f"Upload failed: {e}")
-
-upload_to_s3(json_file_path, "quotes-scraper-petermacero")
+        print(f"❌ Upload failed: {e}")
