@@ -7,10 +7,10 @@ import logging
 from datetime import datetime
 import os
 import boto3
-import pytz
+from zoneinfo import ZoneInfo
 
 #  'Asia/Manila' timezone 
-local_tz = pytz.timezone('Asia/Manila')  
+local_tz = ZoneInfo('Asia/Manila') 
 timestamp = datetime.now(local_tz).strftime('%Y-%m-%d %I:%M %p')
 
 # Set up logging configuration
