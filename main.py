@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 #  'Asia/Manila' timezone 
 local_tz = ZoneInfo('Asia/Manila') 
-timestamp = datetime.now(local_tz).strftime('%Y-%m-%d %I:%M %p')
+timestamp = datetime.now(ZoneInfo('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
 
 # Set up logging configuration
 logging.basicConfig(filename='quotes_scraper.log', level=logging.INFO)
@@ -47,7 +47,7 @@ def parse_quotes(html):
         quote_text = re.sub(r'[^\x00-\x7F]+', '', quote_text)  # Remove any remaining non-ASCII chars
 
         # Add timestamp for each quote
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.now(ZoneInfo('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
 
         extract_quotes.append({
             "author": quote_author,
