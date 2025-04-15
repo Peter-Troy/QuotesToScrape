@@ -21,9 +21,9 @@ chromedriver_path = '/usr/local/bin/chromedriver'
 service = Service(chromedriver_path)
 driver = webdriver.Chrome(service=service, options=chrome_options)
 driver.get("http://quotes.toscrape.com/search.aspx")
-wait = WebDriverWait(driver, 10)
+wait = WebDriverWait(driver, 20)  # Increased timeout
 
-def wait_for_element(locator, timeout=10):
+def wait_for_element(locator, timeout=20):  # Increased timeout
     return WebDriverWait(driver, timeout).until(EC.visibility_of_element_located(locator))
 
 # Get all authors (skip the first placeholder)
@@ -63,7 +63,7 @@ for author in authors:
 
         # Extract quotes
         try:
-            quotes = WebDriverWait(driver, 10).until(
+            quotes = WebDriverWait(driver, 20).until(
                 EC.presence_of_all_elements_located((By.CLASS_NAME, "quote"))
             )
 
@@ -73,6 +73,7 @@ for author in authors:
                 print(f"✅ {author} | {tag} | {text[:50]}...")
         except Exception as e:
             print(f"⚠ No quotes found for {author} - {tag}. Error: {e}")
+            print(driver.page_source)  # Print page source for debugging
 
 # Save to JSON
 json_file_path = "quotes_by_author_and_tag.json"
