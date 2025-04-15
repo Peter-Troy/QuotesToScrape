@@ -1,4 +1,3 @@
-# part1_scraper.py
 import requests
 from bs4 import BeautifulSoup
 import csv
@@ -8,6 +7,11 @@ import logging
 from datetime import datetime
 import os
 import boto3
+import pytz
+
+#  'Asia/Manila' timezone 
+local_tz = pytz.timezone('Asia/Manila')  
+timestamp = datetime.now(local_tz).strftime('%Y-%m-%d %I:%M %p')
 
 # Set up logging configuration
 logging.basicConfig(filename='quotes_scraper.log', level=logging.INFO)
