@@ -115,4 +115,4 @@ if __name__ == "__main__":
     save_to_csv(quotes)
 
     # Step 3: Upload the CSV to an S3 bucket
-    upload_to_s3("output/quotes_output.csv", "quotes-scraper-petermacero", "quotes/quotes_output.csv")
+    upload_to_s3("output/quotes_output.csv", "quotes-scraper-petermacero", "output/quotes_output.csv")
