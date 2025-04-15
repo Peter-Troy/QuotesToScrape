@@ -58,27 +58,26 @@ for author in authors:
     author_dropdown = Select(driver.find_element(By.ID, 'author'))
     author_dropdown.select_by_visible_text(author)
 
-    # Wait for tag dropdown to be populated
+    # Wait for both the tag dropdown AND results container to be ready
     wait.until(lambda d: len(Select(d.find_element(By.ID, "tag")).options) > 1)
+    wait.until(EC.presence_of_element_located((By.ID, 'results')))
 
     # Search quotes by author only (no tag selected)
     try:
-        search_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input.btn.btn-default')))
-        try:
-            ActionChains(driver).move_to_element(search_button).click().perform()
-        except:
-            search_button.click()
-
-        quotes = WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.CLASS_NAME, "quote"))
+        search_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[type="submit"]')))
+        search_button.click()
+        
+        # Wait specifically for quotes to load
+        quotes = wait.until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".quote .content"))
         )
 
         for quote in quotes:
-            text = quote.find_element(By.CLASS_NAME, "content").text.strip()
+            text = quote.text.strip()
             all_quotes.append({"author": author, "tag": None, "quote": text})
             print(f"✅ {author} | No tag | {text[:50]}...")
     except Exception as e:
-        print(f"⚠ No quotes found for {author} (no tag). Error: {e}")
+        print(f"⚠ No quotes found for {author} (no tag). Error: {str(e)[:100]}")
 
     # Now search quotes by each tag
     tag_dropdown = Select(driver.find_element(By.ID, 'tag'))
@@ -86,26 +85,23 @@ for author in authors:
 
     for tag in tags:
         print(f"➡ Selecting tag: {tag}")
-        tag_dropdown = Select(driver.find_element(By.ID, 'tag'))  # Re-locate each time
+        tag_dropdown = Select(driver.find_element(By.ID, 'tag'))
         tag_dropdown.select_by_visible_text(tag)
 
         try:
-            search_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input.btn.btn-default')))
-            try:
-                ActionChains(driver).move_to_element(search_button).click().perform()
-            except:
-                search_button.click()
-
-            quotes = WebDriverWait(driver, 10).until(
-                EC.presence_of_all_elements_located((By.CLASS_NAME, "quote"))
+            search_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[type="submit"]')))
+            search_button.click()
+            
+            quotes = wait.until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".quote .content"))
             )
 
             for quote in quotes:
-                text = quote.find_element(By.CLASS_NAME, "content").text.strip()
+                text = quote.text.strip()
                 all_quotes.append({"author": author, "tag": tag, "quote": text})
                 print(f"✅ {author} | {tag} | {text[:50]}...")
         except Exception as e:
-            print(f"⚠ No quotes found for {author} - {tag}. Error: {e}")
+            print(f"⚠ No quotes found for {author} - {tag}. Error: {str(e)[:100]}")
 
 # Save to JSON
 json_file_path = "quotes_by_author_and_tag.json"
