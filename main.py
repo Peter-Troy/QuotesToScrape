@@ -1,20 +1,24 @@
-# install Libraries needed
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-import json
 import time
 import boto3
 import os
 
+# Set up Chrome options
 chrome_options = Options()
 chrome_options.add_argument("--headless")  # Run browser in headless mode (no UI)
 chrome_options.add_argument("--no-sandbox")  # Use no sandbox mode (important for cloud environments)
 
-# Start browser
-driver = webdriver.Chrome(options=chrome_options)
+# Specify the path to chromedriver using the Service object
+chromedriver_path = '/usr/lib/chromium-browser/chromedriver'
+service = Service(chromedriver_path)
+
+# Start the browser
+driver = webdriver.Chrome(service=service, options=chrome_options)
 driver.get("http://quotes.toscrape.com/search.aspx")
 wait = WebDriverWait(driver, 10)
 
@@ -60,8 +64,8 @@ for author in authors:
                 all_quotes.append({"author": author, "tag": tag, "quote": text})
                 print(f"✅ {author} | {tag} | {text[:50]}...")
 
-        except:
-            print(f"⚠ No quotes found for {author} - {tag}")
+        except Exception as e:
+            print(f"⚠ No quotes found for {author} - {tag}. Error: {e}")
 
 # Save data to JSON
 with open("quotes_by_author_and_tag.json", "w", encoding="utf-8") as json_file:
