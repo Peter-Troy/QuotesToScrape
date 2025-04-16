@@ -36,7 +36,15 @@ def scrape_quotes():
 
             # Reload page to reset dropdown state properly
             driver.get("http://quotes.toscrape.com/search.aspx")
-
+            
+            Select(driver.find_element(By.ID, "author")).select_by_visible_text("Albert Einstein")
+            time.sleep(1)
+            Select(driver.find_element(By.ID, "tag")).select_by_visible_text("inspirational")
+            driver.find_element(By.CSS_SELECTOR, 'input.btn.btn-default').click()
+            
+            quotes = driver.find_elements(By.CLASS_NAME, "quote")
+            print([q.find_element(By.CLASS_NAME, "text").text for q in quotes])
+            
             # Select author
             author_dropdown = Select(wait.until(
                 EC.presence_of_element_located((By.ID, 'author'))
@@ -68,7 +76,7 @@ def scrape_quotes():
                     )
 
                     for quote in quotes:
-                        text = quote.find_element(By.CLASS_NAME, 'content').text.strip()
+                        text = quote.find_element(By.CLASS_NAME, 'text').text.strip('“”')
                         all_quotes.append({
                             "author": author,
                             "tag": tag,
