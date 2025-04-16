@@ -20,7 +20,7 @@ def setup_browser():
 
 def scrape_quotes():
     driver = setup_browser()
-    wait = WebDriverWait(driver, 15)
+    wait = WebDriverWait(driver, 3)
     all_quotes = []
     
     try:
@@ -67,10 +67,6 @@ def scrape_quotes():
                         "tag": tag,
                         "quote": q.text.strip('"')
                     } for q in quotes)
-                except Exception as e:
-                    if "No quotes found" not in driver.page_source:
-                        print(f"Error processing {tag}: {str(e)}")
-                        driver.save_screenshot(f'error_{author[:3]}_{tag[:3]}.png')
         
         return all_quotes
     
