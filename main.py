@@ -26,29 +26,29 @@ def scrape_quotes():
     try:
         driver.get("http://quotes.toscrape.com/search.aspx")
         
-        # Get authors
-        authors = [opt.text for opt in 
-                  Select(wait.until(
-                      EC.presence_of_element_located((By.ID, 'author'))
-                  ).options if opt.text.strip()][1:]
+        # Get authors - Fixed syntax error here
+        author_select = Select(wait.until(
+            EC.presence_of_element_located((By.ID, 'author'))
+        ))
+        authors = [opt.text for opt in author_select.options if opt.text.strip()][1:]
         
         for author in authors:
             print(f"Processing {author}...")
             driver.refresh()  # More reliable than get()
             
-            # Select author
+            # Select author - Fixed missing parenthesis
             author_dropdown = Select(wait.until(
                 EC.presence_of_element_located((By.ID, 'author'))
-            )
+            ))
             author_dropdown.select_by_visible_text(author)
             time.sleep(0.5)
             
-            # Get tags
-            tags = [opt.text for opt in 
-                   Select(driver.find_element(By.ID, 'tag')).options 
-                   if opt.text.strip()][1:]
+            # Get tags - Fixed syntax
+            tag_select = Select(driver.find_element(By.ID, 'tag'))
+            tags = [opt.text for opt in tag_select.options if opt.text.strip()][1:]
             
             for tag in tags:
+                print(f"  Processing tag: {tag}")
                 # Select tag
                 Select(driver.find_element(By.ID, 'tag')).select_by_visible_text(tag)
                 
@@ -67,8 +67,9 @@ def scrape_quotes():
                         "tag": tag,
                         "quote": q.text.strip('"')
                     } for q in quotes)
-                except:
+                except Exception as e:
                     if "No quotes found" not in driver.page_source:
+                        print(f"Error processing {tag}: {str(e)}")
                         driver.save_screenshot(f'error_{author[:3]}_{tag[:3]}.png')
         
         return all_quotes
@@ -79,5 +80,5 @@ def scrape_quotes():
 if __name__ == "__main__":
     quotes = scrape_quotes()
     with open("quotes.json", "w") as f:
-        json.dump(quotes, f, indent=2)
+        json.dump(quotes, f, indent=2, ensure_ascii=False)
     print(f"Success! Saved {len(quotes)} quotes")
