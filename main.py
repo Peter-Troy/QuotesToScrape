@@ -68,9 +68,10 @@ def scrape_quotes():
                         "quote": q.text.strip('"')
                     } for q in quotes)
         
-        return all_quotes
-    
+    finally:
         driver.quit()
+
+    return all_quotes
 
 if __name__ == "__main__":
     quotes = scrape_quotes()
