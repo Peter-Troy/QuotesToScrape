@@ -44,7 +44,7 @@ def scrape_quotes():
             
             quotes = driver.find_elements(By.CLASS_NAME, "quote")
             print([q.find_element(By.CLASS_NAME, "text").text for q in quotes])
-            
+
             # Select author
             author_dropdown = Select(wait.until(
                 EC.presence_of_element_located((By.ID, 'author'))
@@ -63,20 +63,20 @@ def scrape_quotes():
                 try:
                     # Select the tag
                     Select(driver.find_element(By.ID, 'tag')).select_by_visible_text(tag)
-            
+
                     # Click the Search button
                     button = driver.find_element(By.CSS_SELECTOR, 'input.btn.btn-default')
                     driver.execute_script("arguments[0].click();", button)
                     time.sleep(0.5)
-            
+
                     # ✅ Wait until quotes appear
                     WebDriverWait(driver, 5).until(
                         EC.presence_of_all_elements_located((By.CLASS_NAME, "quote"))
                     )
-            
+
                     # ✅ Get all quotes
                     quotes = driver.find_elements(By.CLASS_NAME, "quote")
-            
+
                     for quote in quotes:
                         text = quote.find_element(By.CLASS_NAME, "content").text.strip('“”')
                         all_quotes.append({
@@ -86,15 +86,13 @@ def scrape_quotes():
                         })
                         print(f"✅ {author} | {tag} | {text[:50]}...")
 
-    except Exception as e:
-        if "No quotes found" not in driver.page_source:
-            print(f"    Error processing tag '{tag}' for author '{author}': {e}")
-            driver.save_screenshot(f"error_{author[:3]}_{tag[:3]}.png")
-
                 except Exception as e:
-                    if "No quotes found!" not in driver.page_source:
+                    if "No quotes found" not in driver.page_source:
                         print(f"    Error processing tag '{tag}' for author '{author}': {e}")
                         driver.save_screenshot(f"error_{author[:3]}_{tag[:3]}.png")
+
+    except Exception as e:
+        print(f"Error in scraping: {e}")
 
     finally:
         driver.quit()
