@@ -1,0 +1,4 @@
+boto3==1.34.59
+botocore==1.34.59
+selenium==4.18.1
+
