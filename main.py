@@ -1,3 +1,4 @@
+#import necessary libraries
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
@@ -6,30 +7,52 @@ from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
 import json
 import time
+import boto3
+import os
+
+# Set up the AWS S3 client
+s3 = boto3.client('s3')
+
+# Define function to upload to S3
+def upload_to_s3(file_name, bucket_name, object_name=None):
+    if object_name is None:
+        object_name = file_name
+
+    # Make sure file exists before attempting to upload
+    if not os.path.exists(file_name):
+        print(f"File {file_name} does not exist.")
+        return
+
+    try:
+        # Upload the file to S3
+        s3.upload_file(file_name, bucket_name, object_name)
+        print(f"Uploaded {file_name} to s3://{bucket_name}/{object_name}")
+    except Exception as e:
+        print(f"Upload failed: {e}")
 
 def setup_browser():
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--window-size=1280,720")
-    options.binary_location = '/usr/bin/firefox'  # Adjust as needed
+    options.binary_location = '/usr/bin/firefox'  # path for firefox browser
 
     return webdriver.Firefox(
-        service=Service('/usr/local/bin/geckodriver'),  # Adjust path if needed
+        service=Service('/usr/local/bin/geckodriver'),  # path for geckodriver
         options=options
     )
 
 def scrape_quotes():
-    driver = setup_browser()
+    driver = setup_browser() # Set up the browser and the wait time for elements to load
     wait = WebDriverWait(driver, 5)  # Increased timeout
     all_quotes = []
 
     try:
-        driver.get("http://quotes.toscrape.com/search.aspx")
+        driver.get("http://quotes.toscrape.com/search.aspx") # Open the website for scraping quotes
 
         author_select = Select(wait.until(
             EC.presence_of_element_located((By.ID, 'author'))
         ))
-        authors = [opt.text for opt in author_select.options if opt.text.strip()][1:]
+        authors = [opt.text for opt in author_select.options if opt.text.strip()][1:]  # Extract all the authors from the dropdown, skipping the first option
 
         for author in authors:
             print(f"Processing {author}...")
@@ -61,20 +84,18 @@ def scrape_quotes():
             for tag in tags:
                 print(f"  Processing tag: {tag}")
                 try:
-                    # Select the tag
-                    Select(driver.find_element(By.ID, 'tag')).select_by_visible_text(tag)
+                    Select(driver.find_element(By.ID, 'tag')).select_by_visible_text(tag)# Select the tag
 
-                    # Click the Search button
-                    button = driver.find_element(By.CSS_SELECTOR, 'input.btn.btn-default')
+                    button = driver.find_element(By.CSS_SELECTOR, 'input.btn.btn-default')# Click the Search button
                     driver.execute_script("arguments[0].click();", button)
                     time.sleep(0.5)
 
-                    # ✅ Wait until quotes appear
+                    # Wait until quotes appear
                     WebDriverWait(driver, 5).until(
                         EC.presence_of_all_elements_located((By.CLASS_NAME, "quote"))
                     )
 
-                    # ✅ Get all quotes
+                    #  Get all quotes
                     quotes = driver.find_elements(By.CLASS_NAME, "quote")
 
                     for quote in quotes:
@@ -104,3 +125,6 @@ if __name__ == "__main__":
     with open("quotes.json", "w", encoding="utf-8") as f:
         json.dump(quotes, f, indent=2, ensure_ascii=False)
     print(f"Success! Saved {len(quotes)} quotes")
+
+    # Upload the JSON file to S3
+    upload_to_s3(file_name, "quotes-scraper-petermacero")  # Replace with your S3 bucket name
