@@ -119,12 +119,15 @@ def scrape_quotes():
         driver.quit()
 
     return all_quotes
+    
+# Save the quotes list as a JSON file first
+quotes = scrape_quotes()
 
 if __name__ == "__main__":
-    quotes = scrape_quotes()
-    with open("quotes.json", "w", encoding="utf-8") as f:
+    file_name = "quotes.json" # Save the quotes list to a JSON file
+    with open(file_name, "w", encoding="utf-8") as f:
         json.dump(quotes, f, indent=2, ensure_ascii=False)
     print(f"Success! Saved {len(quotes)} quotes")
 
     # Upload the JSON file to S3
-    upload_to_s3(quotes.json, "quotes-scraper-petermacero")  # Replace with your S3 bucket name
+    upload_to_s3(file_name, "quotes-scraper-petermacero")  # Replace with your S3 bucket name
