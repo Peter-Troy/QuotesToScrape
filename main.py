@@ -43,7 +43,7 @@ def scrape_quotes():
             driver.find_element(By.CSS_SELECTOR, 'input.btn.btn-default').click()
             
             quotes = driver.find_elements(By.CLASS_NAME, "quote")
-            print([q.find_element(By.CLASS_NAME, "text").text for q in quotes])
+            print([q.find_element(By.CLASS_NAME, "content").text for q in quotes])  # Updated to fetch text from <span class="content">
 
             # Select author
             author_dropdown = Select(wait.until(
@@ -78,7 +78,7 @@ def scrape_quotes():
                     quotes = driver.find_elements(By.CLASS_NAME, "quote")
 
                     for quote in quotes:
-                        text = quote.find_element(By.CLASS_NAME, "content").text.strip('“”')
+                        text = quote.find_element(By.CLASS_NAME, "content").text.strip('“”')  # Updated to fetch text from <span class="content">
                         all_quotes.append({
                             "author": author,
                             "tag": tag,
