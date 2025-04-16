@@ -43,7 +43,7 @@ def setup_browser():
 
 def scrape_quotes():
     driver = setup_browser() # Set up the browser and the wait time for elements to load
-    wait = WebDriverWait(driver, 5)  # Increased timeout
+    wait = WebDriverWait(driver, 1)  # Increased timeout
     all_quotes = []
 
     try:
@@ -127,4 +127,4 @@ if __name__ == "__main__":
     print(f"Success! Saved {len(quotes)} quotes")
 
     # Upload the JSON file to S3
-    upload_to_s3(file_name, "quotes-scraper-petermacero")  # Replace with your S3 bucket name
+    upload_to_s3(quotes.json, "quotes-scraper-petermacero")  # Replace with your S3 bucket name
