@@ -70,7 +70,6 @@ def scrape_quotes():
         
         return all_quotes
     
-    finally:
         driver.quit()
 
 if __name__ == "__main__":
